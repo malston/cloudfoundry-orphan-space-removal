@@ -42,56 +42,49 @@ import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STRawGroupDir;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
-
 @SpringBootApplication
 public class Application {
 
-	// @Parameter(names = { "-t", "--target" }, description = "Cloud Foundry target URL", required = true)
 	@Value("#{environment.PCF_TARGET}")
 	private String target;
 
-	// @Parameter(names = { "-ut", "--uaa" }, description = "UAA target URL", required = true)
 	@Value("#{environment.PCF_UAA_TARGET}")
 	private String uaaTarget;
 
-	// @Parameter(names = { "-s", "--space" }, description = "Cloud Foundry space to target", required = true)
 	@Value("#{environment.PCF_SPACE}")
 	private String spaceName;
 
-	// @Parameter(names = { "-o", "--organization" }, description = "Cloud Foundry organization to target")
 	@Value("#{environment.PCF_ORG}")
 	private String orgName;
 
-	// @Parameter(names = { "-u", "--username" }, description = "Username for login")
 	@Value("#{environment.PCF_USERNAME}")
 	private String username;
 
-	// @Parameter(names = { "-p", "--password" }, description = "Password for login")
 	@Value("#{environment.PCF_PASSWORD}")
 	private String password;
 
-	// @Parameter(names = { "-a", "--accessToken" }, description = "OAuth access token")
+	@Value("#{environment.PCF_UAA_ACCESS_TOKEN}")
 	private String accessToken;
 
-	// @Parameter(names = { "-r", "--refreshToken" }, description = "OAuth refresh token")
+	@Value("#{environment.PCF_UAA_REFRESH_TOKEN}")
 	private String refreshToken;
 
-	// @Parameter(names = { "-ci", "--clientID" }, description = "OAuth client ID")
+	@Value("#{environment.PCF_UAA_CLIENT_ID}")
 	private String clientID;
 
-	// @Parameter(names = { "-cs", "--clientSecret" }, description = "OAuth client secret")
+	@Value("#{environment.PCF_UAA_CLIENT_SECRET}")
 	private String clientSecret;
 
-	// @Parameter(names = { "-tc", "--trustSelfSignedCerts" }, description = "Trust self-signed SSL certificates")
 	@Value("#{environment.SKIP_SSL_VALIDATION}")
+//	@Value("${environment.SKIP_SSL_VALIDATION}")
 	private boolean trustSelfSignedCerts;
 
-	// @Parameter(names = { "-v", "--verbose" }, description = "Enable logging of requests and responses")
+//	@Value("#{environment.VERBOSE:false}")
+	@Value("#{environment.VERBOSE}")
 	private boolean verbose;
 
-	// @Parameter(names = { "-d", "--debug" }, description = "Enable debug logging of requests and responses")
+//    @Value("#{environment.DEBUG:false}")
+    @Value("#{environment.DEBUG}")
 	private boolean debug;
 
 	@Autowired
@@ -105,7 +98,6 @@ public class Application {
 				.initializers(new WebApplicationInitializer()).application().run(args);
 
 		Application application = context.getBean(Application.class);
-		// new JCommander(application, args);
 
 		application.validateArgs();
 		application.setupDebugLogging();
@@ -125,7 +117,8 @@ public class Application {
 							numOfRunningApps++;
 						}
 					}
-					out("\nThere are " + numOfRunningApps + " apps running inside the " + space.getName() + " space in the " + org.getName() + " organization.");
+					out("\nThere are " + numOfRunningApps + " apps running inside the " + space.getName()
+							+ " space in the " + org.getName() + " organization.");
 					if (numOfRunningApps == 0) {
 						sendNotification(org, space);
 					}
