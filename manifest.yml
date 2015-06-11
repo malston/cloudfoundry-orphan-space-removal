@@ -8,10 +8,10 @@ applications:
   services:
     - notification-orphan-db
   env:
-    PCF_TARGET: https://api.pcf1.cpe.lab.emc.com
-    PCF_UAA_TARGET: http://uaa.pcf1.cpe.lab.emc.com
-    PCF_SPACE: SandBox
-    PCF_ORG: PCF1-LAB
+    PCF_TARGET: https://api.example.com
+    PCF_UAA_TARGET: http://uaa.example.com
+    PCF_SPACE: ExampleSpace
+    PCF_ORG: ExampleOrg
     PCF_USERNAME: admin
-    PCF_PASSWORD: ae03b1d7c2aebd436aa9
+    PCF_PASSWORD: password
     SKIP_SSL_VALIDATION: true
