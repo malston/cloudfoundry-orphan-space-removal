@@ -6,7 +6,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.cloudfoundry.client.lib.CloudCredentials;
 import org.cloudfoundry.client.lib.CloudFoundryClient;
@@ -15,6 +17,7 @@ import org.cloudfoundry.client.lib.HttpProxyConfiguration;
 import org.cloudfoundry.client.lib.RestLogCallback;
 import org.cloudfoundry.client.lib.RestLogEntry;
 import org.cloudfoundry.client.lib.domain.CloudApplication;
+import org.cloudfoundry.client.lib.domain.CloudApplication.AppState;
 import org.cloudfoundry.client.lib.domain.CloudOrganization;
 import org.cloudfoundry.client.lib.domain.CloudSpace;
 import org.cloudfoundry.client.lib.domain.CloudUser;
@@ -76,15 +79,12 @@ public class Application {
 	private String clientSecret;
 
 	@Value("#{environment.SKIP_SSL_VALIDATION}")
-//	@Value("${environment.SKIP_SSL_VALIDATION}")
 	private boolean trustSelfSignedCerts;
 
-//	@Value("#{environment.VERBOSE:false}")
-	@Value("#{environment.VERBOSE}")
+	@Value("${environment.VERBOSE:false}")
 	private boolean verbose;
 
-//    @Value("#{environment.DEBUG:false}")
-    @Value("#{environment.DEBUG}")
+	@Value("${environment.DEBUG:false}")
 	private boolean debug;
 
 	@Autowired
@@ -106,37 +106,73 @@ public class Application {
 	@Scheduled(initialDelay = 2000, fixedRateString = "${pollingFrequency}")
 	public void checkEmptySpaces() {
 		CloudFoundryOperations client = getCloudFoundryClient();
+		
+		int minimumAppCountPerSpace = Integer.valueOf(environment.getProperty("minimumAppCountPerSpace"));
 
 		for (CloudOrganization organization : client.getOrganizations()) {
+			// Need to refetch an org to get all its values
 			CloudOrganization org = client.getOrgByName(organization.getName(), true);
-			for (CloudSpace space : client.getSpaces()) {
-				if (space.getOrganization().getName().equals(org.getName())) {
-					int numOfRunningApps = 0;
-					for (CloudApplication app : client.getApplications()) {
-						if (app.getSpace().getName().equals(space.getName()) && app.getRunningInstances() > 0) {
-							numOfRunningApps++;
+			Map<String, Integer> emptySpaces = new HashMap<String, Integer>();
+			int numOfRunningAppsInOrg = 0;
+			for (CloudSpace space : org.getSpaces()) {
+				int numOfRunningAppsInSpace = 0;
+				if (null != space.getApplications()) {
+					for (CloudApplication app : space.getApplications()) {
+						out("Found app: '" + app.getName() + "' running '" + app.getRunningInstances()
+								+ "' instances in space: '" + space.getName() + "' and org: '" + org.getName() + "'");
+						// Number of running instances
+						if (AppState.STOPPED != app.getState()) {
+							out("Application is in the " + app.getState() + " state.");
+							numOfRunningAppsInSpace++;
 						}
 					}
-					out("\nThere are " + numOfRunningApps + " apps running inside the " + space.getName()
-							+ " space in the " + org.getName() + " organization.");
-					if (numOfRunningApps == 0) {
-						sendNotification(org, space);
-					}
 				}
+				out("\nThere are " + numOfRunningAppsInSpace + " apps running inside the " + space.getName()
+						+ " space in the " + org.getName() + " organization.");
+				if (numOfRunningAppsInSpace < minimumAppCountPerSpace) {
+					emptySpaces.put(space.getName(), numOfRunningAppsInSpace);
+				}
+				numOfRunningAppsInOrg += numOfRunningAppsInSpace;
+			}
+			if (!emptySpaces.isEmpty()) {
+				STGroup g = new STRawGroupDir("templates");
+				ST notificationTemplate = g.getInstanceOf("notification");
+				notificationTemplate.add("from", "The PCF Ops Team");
+				notificationTemplate.add("orgName", org.getName());
+				notificationTemplate.add("numOfRunningAppsInOrg", numOfRunningAppsInOrg);
+				notificationTemplate.add("minimumAppCountPerSpace", minimumAppCountPerSpace);
+				notificationTemplate.add("maxDays", environment.getProperty("maxDays"));
+				sendNotification(org, emptySpaces, notificationTemplate);
 			}
 		}
 	}
 
-	private void sendNotification(CloudOrganization org, CloudSpace space) {
+	private void sendNotification(CloudOrganization org, Map<String, Integer> spaces, ST notificationTemplate) {
+		StringBuffer messageBody = new StringBuffer();
+		for (String space : spaces.keySet()) {
+			messageBody.append("* Space ").append(space).append(" has ").append(spaces.get(space)).append(" running apps").append("\n");
+		}
+		notificationTemplate.add("spaceBody", messageBody);
+		List<ScimUser> orgOwners = findOrgOwners(org);
+		if (!orgOwners.isEmpty()) {
+			for (ScimUser owner : orgOwners) {
+				List<String> emailTos = new ArrayList<String>();
+				notificationTemplate.add("givenName", owner.getGivenName());
+				emailTos.add(owner.getPrimaryEmail());
+				String orgGuid = org.getMeta().getGuid().toString();
+				String userGuid = owner.getId();
+				notificationService.sendNotification(orgGuid, userGuid, "pcfops@emc.com", emailTos,
+						notificationTemplate.render());
+			}
+		}
+	}
+
+	private List<ScimUser> findOrgOwners(CloudOrganization org) {
 		CloudFoundryOperations client = getCloudFoundryClient();
 		UaaUserOperations uaaUserClient = getUaaUserClient();
 
-		STGroup g = new STRawGroupDir("templates");
-		ST notificationTemplate = g.getInstanceOf("notification");
-		notificationTemplate.add("from", "The PCF Ops Team");
-		notificationTemplate.add("orgName", org.getName());
 		List<CloudUser> users = client.getOrgManagers(org.getMeta().getGuid());
-		List<String> emailTos = new ArrayList<String>();
+		List<ScimUser> orgManagers = new ArrayList<ScimUser>();
 		if (users != null) {
 			for (CloudUser user : users) {
 				out("Lookup user: '" + user.getMeta().getGuid().toString() + "' from UAA.");
@@ -146,28 +182,20 @@ public class Application {
 				try {
 					results = uaaUserClient.getUsers(request);
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					throw new NotificationException(e.getMessage(), e);
 				}
 				if (results != null) {
 					ScimUser scimUser = results.getResources().iterator().next();
-					notificationTemplate.add("givenName", scimUser.getGivenName());
 					if (scimUser.getPrimaryEmail() != null) {
-						// emailTos.add(scimUser.getPrimaryEmail());
-						emailTos.add("malston@pivotal.io");
+						orgManagers.add(scimUser);
 					}
 				} else {
-					notificationTemplate.add("givenName", "Mark");
-					emailTos.add("malston@pivotal.io");
+					throw new NotificationException("Could not find user with guid: '"
+							+ user.getMeta().getGuid().toString() + "'");
 				}
 			}
 		}
-		StringBuffer messageBody = new StringBuffer();
-		messageBody.append("* Space ").append(space.getName()).append("\n");
-		notificationTemplate.add("spaceBody", messageBody);
-		if (!emailTos.isEmpty()) {
-			notificationService.sendNotification("pcfops@emc.com", emailTos, notificationTemplate.render());
-		}
+		return orgManagers;
 	}
 
 	private CloudFoundryOperations getCloudFoundryClient() {

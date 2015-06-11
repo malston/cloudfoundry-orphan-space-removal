@@ -21,7 +21,6 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<start-class>com.emc.cloudfoundry.notification.orphan.Application</start-class>
-
 		<java.version>1.7</java.version>
 	</properties>
 
@@ -59,11 +58,6 @@
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-aspects</artifactId>
 		</dependency>
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <scope>provided</scope>
-        </dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
@@ -106,13 +100,27 @@
 		<dependency>
 			<groupId>com.github.malston</groupId>
 			<artifactId>cloudfoundry-client-lib</artifactId>
-			<version>13f4ca1</version>
+			<version>fd6e51b</version>
 		</dependency>
-		<dependency>
-			<groupId>com.github.malston</groupId>
-			<artifactId>uaa-java-client</artifactId>
-			<version>ff09ea6</version>
-		</dependency>
+        <dependency>
+            <groupId>com.github.malston</groupId>
+            <artifactId>uaa-java-client</artifactId>
+            <version>ff09ea6</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>javax.servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 	</dependencies>
 
 	<repositories>

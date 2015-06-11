@@ -1,10 +1,12 @@
 Hello <givenName>,
 
-Your <orgName> organization has spaces with no running applications.
- 
+You have a total of <numOfRunningAppsInOrg> running apps in the <orgName> organization.
+
+The following spaces in <orgName> contain less than <minimumAppCountPerSpace> running applications. 
+
 <spaceBody>
 
-We will delete if the org or space is not being used.
+If we don't hear from you in the next <maxDays> days, we will delete the above space(s) if they're still not being used.
 
 Sincerely,
 <from>

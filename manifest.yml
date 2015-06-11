@@ -5,14 +5,13 @@ applications:
   instances: 1
   path: target/notification-orphan-0.0.1-SNAPSHOT.jar
   timeout: 160
-#  services:
-#    - notification-orphan-db
+  services:
+    - notification-orphan-db
   env:
-    PCF_TARGET: https://api.cf.isus.emc.com
-    PCF_UAA_TARGET: http://uaa.cf.isus.emc.com
-    PCF_SPACE: MarkSpace
-    PCF_ORG: DeveloperDemoOrg
-    PCF_USERNAME: malston@pivotal.io
-    PCF_PASSWORD: password1
+    PCF_TARGET: https://api.pcf1.cpe.lab.emc.com
+    PCF_UAA_TARGET: http://uaa.pcf1.cpe.lab.emc.com
+    PCF_SPACE: SandBox
+    PCF_ORG: PCF1-LAB
+    PCF_USERNAME: admin
+    PCF_PASSWORD: ae03b1d7c2aebd436aa9
     SKIP_SSL_VALIDATION: true
-  buildpack: java_buildpack_offline
